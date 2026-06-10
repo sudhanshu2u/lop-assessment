@@ -1,0 +1,178 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  super_admin
+  hr_admin
+  manager
+  employee
+}
+
+enum AssignmentStatus {
+  pending
+  in_progress
+  completed
+}
+
+model Department {
+  id        String   @id @default(cuid())
+  name      String
+  function  String?
+  location  String?
+  createdAt DateTime @default(now()) @map("created_at")
+
+  users User[]
+
+  @@map("departments")
+}
+
+model User {
+  id           String    @id @default(cuid())
+  email        String    @unique
+  passwordHash String    @map("password_hash")
+  name         String
+  role         UserRole  @default(employee)
+  departmentId String?   @map("department_id")
+  managerId    String?   @map("manager_id")
+  grade        String?
+  location     String?
+  tenureStart  DateTime? @map("tenure_start")
+  isActive     Boolean   @default(true) @map("is_active")
+  createdAt    DateTime  @default(now()) @map("created_at")
+  updatedAt    DateTime  @updatedAt @map("updated_at")
+
+  department           Department?        @relation(fields: [departmentId], references: [id])
+  manager              User?              @relation("ManagerReports", fields: [managerId], references: [id])
+  reports              User[]             @relation("ManagerReports")
+  assignments          SurveyAssignment[] @relation("AssignedTo")
+  assignedSurveys      SurveyAssignment[] @relation("AssignedBy")
+  auditLogs            AuditLog[]
+  versionsCreated      AssessmentVersion[]
+
+  @@map("users")
+}
+
+model AssessmentVersion {
+  id          String   @id @default(cuid())
+  title       String
+  version     String
+  isActive    Boolean  @default(false) @map("is_active")
+  createdById String   @map("created_by")
+  createdAt   DateTime @default(now()) @map("created_at")
+
+  createdBy   User               @relation(fields: [createdById], references: [id])
+  questions   Question[]
+  assignments SurveyAssignment[]
+
+  @@map("assessment_versions")
+}
+
+model Question {
+  id                  String  @id @default(cuid())
+  assessmentVersionId String  @map("assessment_version_id")
+  text                String
+  dimension           String
+  dimensionLabel      String  @map("dimension_label")
+  orderIndex          Int     @map("order_index")
+  weight              Float   @default(1.0)
+  isActive            Boolean @default(true) @map("is_active")
+
+  assessmentVersion AssessmentVersion @relation(fields: [assessmentVersionId], references: [id])
+  responses         SurveyResponse[]
+
+  @@map("questions")
+}
+
+model SurveyAssignment {
+  id                  String           @id @default(cuid())
+  assessmentVersionId String           @map("assessment_version_id")
+  userId              String           @map("user_id")
+  assignedById        String           @map("assigned_by")
+  dueDate             DateTime?        @map("due_date")
+  isAnonymous         Boolean          @default(false) @map("is_anonymous")
+  status              AssignmentStatus @default(pending)
+  createdAt           DateTime         @default(now()) @map("created_at")
+  updatedAt           DateTime         @updatedAt @map("updated_at")
+
+  assessmentVersion AssessmentVersion @relation(fields: [assessmentVersionId], references: [id])
+  user              User              @relation("AssignedTo", fields: [userId], references: [id])
+  assignedBy        User              @relation("AssignedBy", fields: [assignedById], references: [id])
+  responses         SurveyResponse[]
+  session           SurveySession?
+  result            AssessmentResult?
+
+  @@map("survey_assignments")
+}
+
+model SurveyResponse {
+  id           String   @id @default(cuid())
+  assignmentId String   @map("assignment_id")
+  questionId   String   @map("question_id")
+  score        Int
+  answeredAt   DateTime @default(now()) @map("answered_at")
+
+  assignment SurveyAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+  question   Question         @relation(fields: [questionId], references: [id])
+
+  @@unique([assignmentId, questionId])
+  @@map("survey_responses")
+}
+
+model SurveySession {
+  id               String    @id @default(cuid())
+  assignmentId     String    @unique @map("assignment_id")
+  startedAt        DateTime  @default(now()) @map("started_at")
+  completedAt      DateTime? @map("completed_at")
+  timeTakenSeconds Int?      @map("time_taken_seconds")
+  lastSavedAt      DateTime? @map("last_saved_at")
+  progressJson     Json?     @map("progress_json")
+
+  assignment SurveyAssignment @relation(fields: [assignmentId], references: [id], onDelete: Cascade)
+
+  @@map("survey_sessions")
+}
+
+model AssessmentResult {
+  id                      String   @id @default(cuid())
+  assignmentId            String   @unique @map("assignment_id")
+  dimensionScores         Json     @map("dimension_scores")
+  zoneScores              Json     @map("zone_scores")
+  dominantZone            String   @map("dominant_zone")
+  secondaryZone           String   @map("secondary_zone")
+  leadershipMaturityScore Float    @map("leadership_maturity_score")
+  delegationIndex         Float    @map("delegation_index")
+  strategicThinkingIndex  Float    @map("strategic_thinking_index")
+  executionIndex          Float    @map("execution_index")
+  burnoutRiskScore        Float    @map("burnout_risk_score")
+  successionReadinessScore Float   @map("succession_readiness_score")
+  aiInsights              Json?    @map("ai_insights")
+  createdAt               DateTime @default(now()) @map("created_at")
+
+  assignment SurveyAssignment @relation(fields: [assignmentId], references: [id])
+
+  @@map("assessment_results")
+}
+
+model AuditLog {
+  id           String   @id @default(cuid())
+  userId       String?  @map("user_id")
+  action       String
+  resourceType String   @map("resource_type")
+  resourceId   String?  @map("resource_id")
+  metadata     Json?
+  ipAddress    String?  @map("ip_address")
+  createdAt    DateTime @default(now()) @map("created_at")
+
+  user User? @relation(fields: [userId], references: [id])
+
+  @@index([userId])
+  @@index([resourceType, resourceId])
+  @@index([createdAt])
+  @@map("audit_logs")
+}
