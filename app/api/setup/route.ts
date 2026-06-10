@@ -15,8 +15,8 @@ export async function POST(req: Request) {
 
   try {
     // ── Step 1: Create enums + tables via raw SQL ──────────────────────
-    await prisma.$executeRawUnsafe(`CREATE TYPE IF NOT EXISTS "UserRole" AS ENUM ('super_admin', 'hr_admin', 'manager', 'employee')`);
-    await prisma.$executeRawUnsafe(`CREATE TYPE IF NOT EXISTS "AssignmentStatus" AS ENUM ('pending', 'in_progress', 'completed')`);
+    await prisma.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "UserRole" AS ENUM ('super_admin', 'hr_admin', 'manager', 'employee'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
+    await prisma.$executeRawUnsafe(`DO $$ BEGIN CREATE TYPE "AssignmentStatus" AS ENUM ('pending', 'in_progress', 'completed'); EXCEPTION WHEN duplicate_object THEN NULL; END $$`);
 
     await prisma.$executeRawUnsafe(`
       CREATE TABLE IF NOT EXISTS "departments" (
