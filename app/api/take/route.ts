@@ -36,8 +36,10 @@ export async function POST(req: Request) {
     console.log(`[OTP] ${normalizedEmail} → ${otp}`);
   } else {
     const resend = new Resend(process.env.resend_lop_key);
-    await resend.emails.send({
-      from: process.env.RESEND_FROM ?? "LOP Assessment <noreply@lop-assessment.vercel.app>",
+    // Use Resend's shared sender (works without domain verification)
+    const from = process.env.RESEND_FROM ?? "onboarding@resend.dev";
+    const { error } = await resend.emails.send({
+      from,
       to: normalizedEmail,
       subject: "Your LOP Assessment verification code",
       html: `
@@ -54,6 +56,10 @@ export async function POST(req: Request) {
         </div>
       `,
     });
+    if (error) {
+      console.error(`[OTP EMAIL ERROR] ${normalizedEmail}:`, JSON.stringify(error));
+      return NextResponse.json({ error: "Failed to send verification email. Please try again." }, { status: 500 });
+    }
   }
 
   return NextResponse.json({ ok: true, step: "verify", token });
