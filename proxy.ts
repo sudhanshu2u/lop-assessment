@@ -13,6 +13,8 @@ export default auth((req) => {
   const path = req.nextUrl.pathname;
 
   if (!session) {
+    // Root and unknown paths go to /take (public entry point)
+    if (path === "/") return NextResponse.redirect(new URL("/take", req.url));
     return NextResponse.redirect(new URL("/login", req.url));
   }
 
