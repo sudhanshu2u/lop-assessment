@@ -103,6 +103,9 @@ export async function PATCH(req: Request) {
   if (!key || key !== process.env.SETUP_SECRET) {
     return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
   }
+  const validIds = DEPARTMENTS.map((d) => d.id);
+  // Remove departments no longer in the canonical list
+  await prisma.department.deleteMany({ where: { id: { notIn: validIds } } });
   for (const d of DEPARTMENTS) {
     await prisma.department.upsert({
       where: { id: d.id },
