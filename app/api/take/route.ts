@@ -31,11 +31,11 @@ export async function POST(req: Request) {
     .sign(secret);
 
   // Send OTP email
-  if (!process.env.RESEND_API_KEY) {
+  if (!process.env.resend_lop_key) {
     // Dev fallback: log OTP to console if no email key configured
     console.log(`[OTP] ${normalizedEmail} → ${otp}`);
   } else {
-    const resend = new Resend(process.env.RESEND_API_KEY);
+    const resend = new Resend(process.env.resend_lop_key);
     await resend.emails.send({
       from: process.env.RESEND_FROM ?? "LOP Assessment <noreply@lop-assessment.vercel.app>",
       to: normalizedEmail,
