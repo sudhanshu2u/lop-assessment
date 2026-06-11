@@ -7,6 +7,7 @@ import type { Zone, Dimension, DimensionScores, ZoneScores } from "@/lib/scoring
 import RadarChart from "@/components/charts/RadarChart";
 import ZoneBarChart from "@/components/charts/ZoneBarChart";
 import MaturityGauge from "@/components/charts/MaturityGauge";
+import QuadrantChart from "@/components/charts/QuadrantChart";
 import AIInsightsPanel from "@/components/report/AIInsightsPanel";
 
 export default async function ReportPage({
@@ -56,6 +57,11 @@ export default async function ReportPage({
     .sort((a, b) => b.score - a.score);
 
   const aiInsights = result.aiInsights as Record<string, string> | null;
+
+  // Quadrant axes
+  const executionScore = Math.round((dims.G + dims.J) / 2);
+  const strategicScore = Math.round((dims.A + dims.C + dims.I) / 3);
+  const userName = result.assignment.user.name;
 
   return (
     <div className="max-w-5xl space-y-6 animate-fade-in">
@@ -107,15 +113,78 @@ export default async function ReportPage({
         ))}
       </div>
 
-      {/* Charts */}
+      {/* Charts row 1: Radar + Quadrant */}
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white rounded-2xl border border-gray-200 p-5">
-          <h3 className="font-semibold text-gray-900 mb-4">Dimension Profile</h3>
+          <h3 className="font-semibold text-gray-900 mb-1">Dimension Profile</h3>
+          <p className="text-xs text-gray-400 mb-4">Scores across all 10 leadership dimensions (0–100)</p>
           <RadarChart data={radarData} />
         </div>
         <div className="bg-white rounded-2xl border border-gray-200 p-5">
-          <h3 className="font-semibold text-gray-900 mb-4">Operating Zone Scores</h3>
-          <ZoneBarChart data={zoneData} />
+          <h3 className="font-semibold text-gray-900 mb-1">Leadership Quadrant</h3>
+          <p className="text-xs text-gray-400 mb-4">
+            X: Execution (Accountability + Workload) · Y: Strategy (Strategic Thinking + Delegation + Collaboration)
+          </p>
+          <QuadrantChart executionScore={executionScore} strategicScore={strategicScore} name={userName} />
+        </div>
+      </div>
+
+      {/* Operating Zone Scores with strengths/improvements */}
+      <div className="bg-white rounded-2xl border border-gray-200 p-6">
+        <h3 className="font-semibold text-gray-900 mb-1">Operating Zone Scores</h3>
+        <p className="text-xs text-gray-400 mb-5">Each zone score shows how strongly this operating style is present. Higher = more dominant.</p>
+        <div className="space-y-4">
+          {zoneData.map(({ zone, score }) => {
+            const zoneKey = zone.replace("Crisis Maker", "CrisisMaker") as Zone;
+            const profile = ZONE_PROFILES[zoneKey];
+            const isDominant = zone === dom.replace("CrisisMaker", "Crisis Maker");
+            const isSecondary = zone === sec.replace("CrisisMaker", "Crisis Maker");
+            const barColor = score >= 70 ? "bg-indigo-500" : score >= 50 ? "bg-indigo-400" : "bg-gray-300";
+            const isPositiveZone = ["Dreamer", "Perfectionist", "Delegate", "Rebel"].includes(zoneKey);
+            return (
+              <div key={zone} className={`rounded-xl border p-4 transition-all ${isDominant ? "border-indigo-300 bg-indigo-50/50" : isSecondary ? "border-gray-200 bg-gray-50/50" : "border-gray-100"}`}>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg">{profile.emoji}</span>
+                    <span className="font-semibold text-gray-900 text-sm">{zone}</span>
+                    {isDominant && <span className="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full">Primary</span>}
+                    {isSecondary && <span className="text-xs bg-gray-500 text-white px-2 py-0.5 rounded-full">Secondary</span>}
+                  </div>
+                  <span className="text-sm font-bold text-gray-700">{score}/100</span>
+                </div>
+                <div className="w-full bg-gray-200 rounded-full h-1.5 mb-3">
+                  <div className={`${barColor} h-1.5 rounded-full transition-all`} style={{ width: `${score}%` }} />
+                </div>
+                {(isDominant || isSecondary) && (
+                  <div className="grid grid-cols-2 gap-3 mt-3">
+                    <div>
+                      <p className="text-xs font-semibold text-emerald-700 mb-1.5">✓ What works well</p>
+                      <ul className="space-y-1">
+                        {profile.strengths.map((s) => (
+                          <li key={s} className="text-xs text-gray-600 flex gap-1.5">
+                            <span className="text-emerald-400 flex-shrink-0 mt-0.5">•</span>{s}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                    <div>
+                      <p className="text-xs font-semibold text-amber-700 mb-1.5">△ Scope for improvement</p>
+                      <ul className="space-y-1">
+                        {profile.risks.map((r) => (
+                          <li key={r} className="text-xs text-gray-600 flex gap-1.5">
+                            <span className="text-amber-400 flex-shrink-0 mt-0.5">•</span>{r}
+                          </li>
+                        ))}
+                      </ul>
+                    </div>
+                  </div>
+                )}
+                {!isDominant && !isSecondary && score >= 40 && (
+                  <p className="text-xs text-gray-500 italic mt-1">{profile.tagline}</p>
+                )}
+              </div>
+            );
+          })}
         </div>
       </div>
 
