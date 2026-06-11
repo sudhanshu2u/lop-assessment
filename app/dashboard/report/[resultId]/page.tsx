@@ -94,16 +94,27 @@ export default async function ReportPage({
         </a>
       </div>
 
+      {/* Zone explainer */}
+      <div className="bg-indigo-50 border border-indigo-100 rounded-2xl px-6 py-4">
+        <p className="text-sm text-indigo-900 leading-relaxed">
+          <span className="font-semibold">What are Operating Zones?</span> Based on your 40 responses, the scoring engine maps your leadership behaviour across 7 operating patterns.
+          Your <span className="font-semibold">Primary Zone</span> is the style that dominates your day-to-day approach — how you instinctively lead, decide, and respond under pressure.
+          Your <span className="font-semibold">Secondary Zone</span> is a supporting pattern that also shows up, often in different contexts or when the primary style is under stress.
+          Together they paint a picture of your natural operating range.
+        </p>
+      </div>
+
       {/* Zone cards */}
       <div className="grid grid-cols-2 gap-4">
         {[
-          { label: "Primary Zone", profile: domProfile },
-          { label: "Secondary Zone", profile: secProfile },
-        ].map(({ label, profile }) => (
+          { label: "Primary Zone", sublabel: "Your dominant day-to-day style", profile: domProfile },
+          { label: "Secondary Zone", sublabel: "Your supporting / situational style", profile: secProfile },
+        ].map(({ label, sublabel, profile }) => (
           <div key={label} className={`rounded-2xl p-5 ${profile.color}`}>
-            <div className={`text-xs font-semibold uppercase tracking-wider mb-1 ${profile.textColor} opacity-70`}>
+            <div className={`text-xs font-semibold uppercase tracking-wider ${profile.textColor} opacity-60`}>
               {label}
             </div>
+            <div className={`text-xs ${profile.textColor} opacity-70 mb-2`}>{sublabel}</div>
             <div className={`text-xl font-bold ${profile.textColor} mb-1`}>
               {profile.emoji} {profile.label}
             </div>
