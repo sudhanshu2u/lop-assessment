@@ -51,12 +51,10 @@ export async function POST(req: Request) {
 
     results.push("✓ Schema ready");
 
-    // Seed — bcrypt at 10 rounds to stay within serverless timeout
-    const depts = await Promise.all([
-      prisma.department.upsert({ where: { id: "dept-technology" }, update: {}, create: { id: "dept-technology", name: "Technology", function: "Engineering", location: "Mumbai" } }),
-      prisma.department.upsert({ where: { id: "dept-sales" }, update: {}, create: { id: "dept-sales", name: "Sales", function: "Revenue", location: "Delhi" } }),
-      prisma.department.upsert({ where: { id: "dept-hr" }, update: {}, create: { id: "dept-hr", name: "Human Resources", function: "People", location: "Bangalore" } }),
-    ]);
+    // Seed departments
+    const depts = await Promise.all(
+      DEPARTMENTS.map((d) => prisma.department.upsert({ where: { id: d.id }, update: { name: d.name }, create: { id: d.id, name: d.name } }))
+    );
     results.push(`✓ ${depts.length} departments`);
 
     const [h1, h2, h3, h4] = await Promise.all([
@@ -86,4 +84,31 @@ export async function POST(req: Request) {
     const msg = err instanceof Error ? err.message : String(err);
     return NextResponse.json({ ok: false, error: msg, results }, { status: 500 });
   }
+}
+
+const DEPARTMENTS = [
+  { id: "dept-sales", name: "Sales" },
+  { id: "dept-legal", name: "Legal" },
+  { id: "dept-marketing", name: "Marketing" },
+  { id: "dept-crm", name: "CRM" },
+  { id: "dept-hr", name: "HR" },
+  { id: "dept-transformation", name: "Transformation Office" },
+  { id: "dept-construction", name: "Construction" },
+  { id: "dept-accounts", name: "Accounts & Finance" },
+  { id: "dept-other", name: "Other" },
+];
+
+export async function PATCH(req: Request) {
+  const key = req.headers.get("x-setup-key");
+  if (!key || key !== process.env.SETUP_SECRET) {
+    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+  }
+  for (const d of DEPARTMENTS) {
+    await prisma.department.upsert({
+      where: { id: d.id },
+      update: { name: d.name },
+      create: { id: d.id, name: d.name },
+    });
+  }
+  return NextResponse.json({ ok: true, departments: DEPARTMENTS.map((d) => d.name) });
 }
