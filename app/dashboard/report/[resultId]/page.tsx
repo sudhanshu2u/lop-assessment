@@ -4,6 +4,69 @@ import { redirect, notFound } from "next/navigation";
 import { ZONE_PROFILES } from "@/lib/scoring/zone-profiles";
 import { DIMENSION_LABELS, DIMENSIONS } from "@/lib/scoring/types";
 import type { Zone, Dimension, DimensionScores, ZoneScores } from "@/lib/scoring/types";
+const DIMENSION_GUIDANCE: Record<string, { high: string; mid: string; low: string; focus: string }> = {
+  A: {
+    high: "You consistently think ahead and align decisions with long-term goals. A clear strategic asset.",
+    mid: "You think strategically in familiar contexts but may default to tactical mode under pressure.",
+    low: "Day-to-day tasks tend to dominate. Long-term thinking may be crowded out by immediate demands.",
+    focus: "Dedicate 30 min weekly to review where your team/role will be in 12 months. Practice asking 'why' before 'how'.",
+  },
+  B: {
+    high: "You catch errors, maintain quality standards, and trace root causes methodically.",
+    mid: "Quality is generally good but can slip under tight deadlines or competing demands.",
+    low: "Detail and accuracy may be inconsistent, especially under time pressure.",
+    focus: "Build a personal review checklist for key deliverables. Slow down before submitting critical work.",
+  },
+  C: {
+    high: "You empower others effectively, assign based on strengths, and follow up without micromanaging.",
+    mid: "You delegate in theory but may hold back key tasks or struggle to fully let go.",
+    low: "Most work stays with you. This limits team growth and can create bottlenecks.",
+    focus: "Identify one task this week you can fully hand over. Brief clearly, agree on the outcome, then step back.",
+  },
+  D: {
+    high: "You remain composed under pressure and recover quickly from stressful periods.",
+    mid: "You manage stress adequately in most situations but some high-pressure scenarios knock you off balance.",
+    low: "Stress is visibly affecting your decision-making, energy, or how you show up for your team.",
+    focus: "Build a 'pressure protocol' — a personal routine for when things escalate (e.g. pause, prioritise, communicate).",
+  },
+  E: {
+    high: "You proactively drive improvements, take ownership beyond your role, and push forward despite resistance.",
+    mid: "You show initiative in your comfort zone but may wait for permission or clearer signals in new areas.",
+    low: "Tasks tend to wait for direction. Opportunities to lead and improve may be missed.",
+    focus: "Each week, identify one problem you can solve without being asked. Start small — initiative compounds.",
+  },
+  F: {
+    high: "You adapt quickly, embrace change as opportunity, and actively help others through transitions.",
+    mid: "You accept change intellectually but may need time to fully adjust your approach in practice.",
+    low: "Change feels disruptive and may trigger resistance or disengagement.",
+    focus: "When change is announced, write down one thing it could improve. Reframing disruption as opportunity is a skill.",
+  },
+  G: {
+    high: "You take full ownership of outcomes, follow through reliably, and hold others to agreed standards.",
+    mid: "Accountability is generally present but may weaken when situations get difficult or ambiguous.",
+    low: "Commitments may slip or responsibility may shift under pressure.",
+    focus: "For every commitment you make, log it with a deadline. Review weekly. Proactive communication beats missed deadlines.",
+  },
+  H: {
+    high: "You perform exceptionally in crises — but watch for manufacturing urgency in stable periods.",
+    mid: "You engage well under pressure but can sustain focus in routine environments too.",
+    low: "Routine work engages you well. Be aware that some urgency-creation can motivate, but excess drains teams.",
+    focus: "Notice when you escalate urgency unnecessarily. In stable periods, focus energy on prevention over response.",
+  },
+  I: {
+    high: "You build strong cross-functional relationships, share openly, and adapt your communication to others.",
+    mid: "Collaboration works within your team but cross-functional relationships may be underdeveloped.",
+    low: "Working in silos is a risk. Others may not feel informed, included, or heard.",
+    focus: "Schedule one cross-team conversation per week. Ask for input on decisions before they are finalised.",
+  },
+  J: {
+    high: "You estimate accurately, protect high-priority work, and sustain quality even under volume.",
+    mid: "Priorities are generally managed but reactive tasks can crowd out important work at busy times.",
+    low: "Workload feels unsustainable. Quality or priority alignment may be suffering.",
+    focus: "Start each week by listing your top 3 priorities. Protect time for them before reactive tasks fill the calendar.",
+  },
+};
+
 import RadarChart from "@/components/charts/RadarChart";
 import ZoneBarChart from "@/components/charts/ZoneBarChart";
 import MaturityGauge from "@/components/charts/MaturityGauge";
@@ -230,50 +293,49 @@ export default async function ReportPage({
         </div>
       </div>
 
-      {/* Dimension breakdown */}
+      {/* Dimension breakdown — rich cards */}
       <div className="bg-white rounded-2xl border border-gray-200 p-6">
-        <h3 className="font-semibold text-gray-900 mb-4">Dimension Breakdown</h3>
-        <div className="space-y-3">
+        <h3 className="font-semibold text-gray-900 mb-1">Dimension Breakdown</h3>
+        <p className="text-xs text-gray-400 mb-5">Each dimension is scored 0–100. Green = strength · Amber = developing · Red = focus area</p>
+        <div className="space-y-4">
           {DIMENSIONS.map((d) => {
             const score = Math.round(dims[d]);
-            const barColor = score >= 70 ? "bg-emerald-500" : score >= 50 ? "bg-indigo-400" : "bg-amber-400";
+            const isStrength = score >= 70;
+            const isDeveloping = score >= 45 && score < 70;
+            const isFocus = score < 45;
+            const barColor = isStrength ? "bg-emerald-500" : isDeveloping ? "bg-indigo-400" : "bg-amber-400";
+            const badge = isStrength
+              ? { label: "Strength", cls: "bg-emerald-100 text-emerald-700" }
+              : isDeveloping
+              ? { label: "Developing", cls: "bg-indigo-100 text-indigo-700" }
+              : { label: "Focus Area", cls: "bg-amber-100 text-amber-700" };
+            const guidance = DIMENSION_GUIDANCE[d as Dimension];
             return (
-              <div key={d} className="flex items-center gap-3">
-                <div className="w-5 text-xs font-bold text-gray-400">{d}</div>
-                <div className="w-44 text-sm text-gray-700 truncate">{DIMENSION_LABELS[d as Dimension]}</div>
-                <div className="flex-1 bg-gray-100 rounded-full h-2">
-                  <div className={`${barColor} h-2 rounded-full`} style={{ width: `${score}%` }} />
+              <div key={d} className="border border-gray-100 rounded-xl p-4">
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="w-6 h-6 rounded-full bg-gray-100 text-xs font-bold text-gray-500 flex items-center justify-center flex-shrink-0">{d}</span>
+                  <span className="font-semibold text-gray-900 text-sm flex-1">{DIMENSION_LABELS[d as Dimension]}</span>
+                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
+                  <span className="text-sm font-bold text-gray-700 w-8 text-right">{score}</span>
                 </div>
-                <div className="w-8 text-sm font-semibold text-gray-700 text-right">{score}</div>
+                <div className="w-full bg-gray-100 rounded-full h-1.5 mb-3">
+                  <div className={`${barColor} h-1.5 rounded-full`} style={{ width: `${score}%` }} />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-xs font-semibold text-emerald-700 mb-1">✓ What this means</p>
+                    <p className="text-xs text-gray-600 leading-relaxed">
+                      {isStrength ? guidance.high : isDeveloping ? guidance.mid : guidance.low}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-xs font-semibold text-indigo-700 mb-1">→ Focus area</p>
+                    <p className="text-xs text-gray-600 leading-relaxed">{guidance.focus}</p>
+                  </div>
+                </div>
               </div>
             );
           })}
-        </div>
-      </div>
-
-      {/* Strengths & Risks */}
-      <div className="grid grid-cols-2 gap-4">
-        <div className="bg-white rounded-2xl border border-gray-200 p-5">
-          <h3 className="font-semibold text-gray-900 mb-3">Strengths</h3>
-          <ul className="space-y-2">
-            {domProfile.strengths.map((s) => (
-              <li key={s} className="flex gap-2 text-sm text-gray-700">
-                <span className="text-emerald-500 mt-0.5 flex-shrink-0">✓</span>
-                {s}
-              </li>
-            ))}
-          </ul>
-        </div>
-        <div className="bg-white rounded-2xl border border-gray-200 p-5">
-          <h3 className="font-semibold text-gray-900 mb-3">Development Areas</h3>
-          <ul className="space-y-2">
-            {domProfile.risks.map((r) => (
-              <li key={r} className="flex gap-2 text-sm text-gray-700">
-                <span className="text-amber-500 mt-0.5 flex-shrink-0">△</span>
-                {r}
-              </li>
-            ))}
-          </ul>
         </div>
       </div>
 
