@@ -116,18 +116,26 @@ export default function TakePage() {
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
           {/* Tabs */}
           {step === "form" && (
-            <div className="flex border-b border-gray-200">
+            <div className="flex border-b border-gray-200 bg-gray-50">
               <button
                 onClick={() => switchMode("signup")}
-                className={`flex-1 py-3.5 text-sm font-semibold transition-colors ${mode === "signup" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}
+                className={`flex-1 py-4 text-sm font-semibold transition-all border-b-2 ${
+                  mode === "signup"
+                    ? "border-indigo-600 text-indigo-600 bg-white"
+                    : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                }`}
               >
-                Sign Up
+                New User? Sign Up
               </button>
               <button
                 onClick={() => switchMode("login")}
-                className={`flex-1 py-3.5 text-sm font-semibold transition-colors ${mode === "login" ? "bg-indigo-600 text-white" : "text-gray-500 hover:text-gray-700 hover:bg-gray-50"}`}
+                className={`flex-1 py-4 text-sm font-semibold transition-all border-b-2 ${
+                  mode === "login"
+                    ? "border-indigo-600 text-indigo-600 bg-white"
+                    : "border-transparent text-gray-400 hover:text-gray-600 hover:bg-gray-100"
+                }`}
               >
-                Log In
+                Returning? Log In
               </button>
             </div>
           )}
