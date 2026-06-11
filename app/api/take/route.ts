@@ -1,7 +1,13 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import bcrypt from "bcryptjs";
-import { randomUUID } from "crypto";
+import { SignJWT } from "jose";
+import { Resend } from "resend";
+
+const secret = new TextEncoder().encode(process.env.NEXTAUTH_SECRET!);
+
+function otp6() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
 
 export async function GET() {
   const departments = await prisma.department.findMany({ orderBy: { name: "asc" } });
@@ -16,63 +22,39 @@ export async function POST(req: Request) {
   }
 
   const normalizedEmail = email.trim().toLowerCase();
+  const otp = otp6();
 
-  // Generate a fresh temp password every time (auto-signin only — user never types this)
-  const tempPassword = randomUUID();
-  const hash = await bcrypt.hash(tempPassword, 10);
+  // Sign OTP + form data into a short-lived JWT (10 min)
+  const token = await new SignJWT({ email: normalizedEmail, name: name.trim(), departmentId, grade, otp })
+    .setProtectedHeader({ alg: "HS256" })
+    .setExpirationTime("10m")
+    .sign(secret);
 
-  // Upsert user — updates name/password so re-registrants can always sign in
-  const user = await prisma.user.upsert({
-    where: { email: normalizedEmail },
-    update: { passwordHash: hash, name: name.trim(), ...(departmentId ? { departmentId } : {}), ...(grade ? { grade } : {}) },
-    create: {
-      email: normalizedEmail,
-      passwordHash: hash,
-      name: name.trim(),
-      role: "employee",
-      ...(departmentId ? { departmentId } : {}),
-      ...(grade ? { grade } : {}),
-    },
-  });
-
-  // Find active assessment version
-  const version = await prisma.assessmentVersion.findFirst({ where: { isActive: true } });
-  if (!version) {
-    return NextResponse.json({ error: "No active assessment found. Contact your HR admin." }, { status: 404 });
-  }
-
-  // Check for existing assignment
-  const existing = await prisma.surveyAssignment.findFirst({
-    where: { userId: user.id },
-    include: { result: { select: { id: true } } },
-    orderBy: { createdAt: "desc" },
-  });
-
-  // Already completed → send to their report
-  if (existing?.status === "completed" && existing.result) {
-    return NextResponse.json({
-      ok: true,
-      email: normalizedEmail,
-      password: tempPassword,
-      completed: true,
-      resultId: existing.result.id,
+  // Send OTP email
+  if (!process.env.RESEND_API_KEY) {
+    // Dev fallback: log OTP to console if no email key configured
+    console.log(`[OTP] ${normalizedEmail} → ${otp}`);
+  } else {
+    const resend = new Resend(process.env.RESEND_API_KEY);
+    await resend.emails.send({
+      from: process.env.RESEND_FROM ?? "LOP Assessment <noreply@lop-assessment.vercel.app>",
+      to: normalizedEmail,
+      subject: "Your LOP Assessment verification code",
+      html: `
+        <div style="font-family:sans-serif;max-width:480px;margin:0 auto;padding:32px 24px">
+          <div style="background:#4f46e5;border-radius:12px;padding:24px;text-align:center;margin-bottom:24px">
+            <h1 style="color:#fff;font-size:20px;margin:0">Leadership Operating Profile</h1>
+          </div>
+          <p style="color:#374151;font-size:15px">Hi <strong>${name.trim()}</strong>,</p>
+          <p style="color:#374151;font-size:15px">Your verification code for the LOP Assessment is:</p>
+          <div style="background:#f3f4f6;border-radius:12px;padding:24px;text-align:center;margin:24px 0">
+            <span style="font-size:40px;font-weight:700;letter-spacing:8px;color:#4f46e5">${otp}</span>
+          </div>
+          <p style="color:#6b7280;font-size:13px">This code expires in 10 minutes. If you didn't request this, you can ignore this email.</p>
+        </div>
+      `,
     });
   }
 
-  // In progress → resume
-  if (existing && existing.status !== "completed") {
-    return NextResponse.json({ ok: true, email: normalizedEmail, password: tempPassword, assignmentId: existing.id });
-  }
-
-  // New assignment
-  const assignment = await prisma.surveyAssignment.create({
-    data: {
-      assessmentVersionId: version.id,
-      userId: user.id,
-      assignedById: user.id,
-      status: "pending",
-    },
-  });
-
-  return NextResponse.json({ ok: true, email: normalizedEmail, password: tempPassword, assignmentId: assignment.id });
+  return NextResponse.json({ ok: true, step: "verify", token });
 }

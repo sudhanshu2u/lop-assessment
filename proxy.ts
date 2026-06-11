@@ -27,4 +27,5 @@ export default auth((req) => {
 
 export const config = {
   matcher: ["/((?!login|take|api/auth|api/setup|api/take|_next/static|_next/image|favicon.ico|public).*)"],
+  // Note: api/take covers both /api/take and /api/take/verify
 };

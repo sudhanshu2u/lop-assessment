@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { signIn } from "next-auth/react";
 import { useRouter } from "next/navigation";
 
@@ -10,140 +10,176 @@ export default function TakePage() {
   const router = useRouter();
   const [departments, setDepartments] = useState<Department[]>([]);
   const [form, setForm] = useState({ name: "", email: "", departmentId: "", grade: "" });
+  const [step, setStep] = useState<"form" | "otp">("form");
+  const [otpToken, setOtpToken] = useState("");
+  const [otp, setOtp] = useState(["", "", "", "", "", ""]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const otpRefs = useRef<(HTMLInputElement | null)[]>([]);
 
   useEffect(() => {
     fetch("/api/take").then((r) => r.json()).then((d) => setDepartments(d.departments ?? []));
   }, []);
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function handleFormSubmit(e: React.FormEvent) {
     e.preventDefault();
     setError("");
     setLoading(true);
-
     try {
-      // Step 1: create/find user + assignment
       const res = await fetch("/api/take", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify(form),
       });
       const data = await res.json();
+      if (!res.ok || !data.ok) { setError(data.error ?? "Something went wrong."); return; }
+      setOtpToken(data.token);
+      setStep("otp");
+    } catch { setError("Network error. Please try again."); }
+    finally { setLoading(false); }
+  }
 
-      if (!res.ok || !data.ok) {
-        setError(data.error ?? "Something went wrong. Please try again.");
-        return;
-      }
-
-      // Step 2: auto sign-in
-      const signInResult = await signIn("credentials", {
-        email: data.email,
-        password: data.password,
-        redirect: false,
+  async function handleOtpSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    const code = otp.join("");
+    if (code.length < 6) { setError("Please enter the full 6-digit code."); return; }
+    setError("");
+    setLoading(true);
+    try {
+      const res = await fetch("/api/take/verify", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ token: otpToken, otp: code }),
       });
+      const data = await res.json();
+      if (!res.ok || !data.ok) { setError(data.error ?? "Verification failed."); return; }
 
-      if (signInResult?.error) {
-        setError("Sign-in failed. Please try again.");
-        return;
-      }
+      const signInResult = await signIn("credentials", { email: data.email, password: data.password, redirect: false });
+      if (signInResult?.error) { setError("Sign-in failed. Please try again."); return; }
 
-      // Step 3: redirect
       if (data.completed && data.resultId) {
         router.push(`/dashboard/report/${data.resultId}`);
       } else {
         router.push(`/dashboard/assessment/${data.assignmentId}`);
       }
-    } catch {
-      setError("Network error. Please try again.");
-    } finally {
-      setLoading(false);
+    } catch { setError("Network error. Please try again."); }
+    finally { setLoading(false); }
+  }
+
+  function handleOtpKey(i: number, e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === "Backspace" && !otp[i] && i > 0) {
+      otpRefs.current[i - 1]?.focus();
+    }
+  }
+
+  function handleOtpChange(i: number, val: string) {
+    const digit = val.replace(/\D/g, "").slice(-1);
+    const next = [...otp];
+    next[i] = digit;
+    setOtp(next);
+    if (digit && i < 5) otpRefs.current[i + 1]?.focus();
+  }
+
+  function handleOtpPaste(e: React.ClipboardEvent) {
+    const text = e.clipboardData.getData("text").replace(/\D/g, "").slice(0, 6);
+    if (text.length === 6) {
+      setOtp(text.split(""));
+      otpRefs.current[5]?.focus();
+      e.preventDefault();
     }
   }
 
   return (
     <div className="min-h-screen bg-slate-50 flex items-center justify-center p-4">
       <div className="w-full max-w-md">
-        {/* Header */}
         <div className="text-center mb-8">
           <div className="w-14 h-14 bg-indigo-600 rounded-2xl flex items-center justify-center mx-auto mb-4 shadow-lg">
             <span className="text-white text-2xl font-bold">L</span>
           </div>
           <h1 className="text-2xl font-bold text-gray-900">Leadership Operating Profile</h1>
-          <p className="text-gray-500 mt-2 text-sm">
-            40 questions · ~15 minutes · Confidential
-          </p>
+          <p className="text-gray-500 mt-2 text-sm">40 questions · ~15 minutes · Confidential</p>
         </div>
 
-        {/* Card */}
         <div className="bg-white rounded-2xl shadow-sm border border-gray-200 p-8">
-          <h2 className="text-lg font-semibold text-gray-900 mb-1">Start your assessment</h2>
-          <p className="text-sm text-gray-500 mb-6">Enter your details to begin. Your responses are private.</p>
-
-          <form onSubmit={handleSubmit} className="space-y-4">
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Full Name <span className="text-red-500">*</span></label>
-              <input
-                type="text"
-                required
-                placeholder="e.g. Priya Sharma"
-                value={form.name}
-                onChange={(e) => setForm({ ...form, name: e.target.value })}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Work Email <span className="text-red-500">*</span></label>
-              <input
-                type="email"
-                required
-                placeholder="you@company.com"
-                value={form.email}
-                onChange={(e) => setForm({ ...form, email: e.target.value })}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
-              <select
-                value={form.departmentId}
-                onChange={(e) => setForm({ ...form, departmentId: e.target.value })}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white"
-              >
-                <option value="">Select department</option>
-                {departments.map((d) => (
-                  <option key={d.id} value={d.id}>{d.name}</option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-gray-700 mb-1">Grade / Level <span className="text-gray-400 font-normal">(optional)</span></label>
-              <input
-                type="text"
-                placeholder="e.g. L4, Manager, VP"
-                value={form.grade}
-                onChange={(e) => setForm({ ...form, grade: e.target.value })}
-                className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
-              />
-            </div>
-
-            {error && (
-              <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-                {error}
-              </div>
-            )}
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-3 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mt-2"
-            >
-              {loading ? "Setting up your assessment…" : "Begin Assessment →"}
-            </button>
-          </form>
+          {step === "form" ? (
+            <>
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">Start your assessment</h2>
+              <p className="text-sm text-gray-500 mb-6">We'll send a verification code to your work email.</p>
+              <form onSubmit={handleFormSubmit} className="space-y-4">
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Full Name <span className="text-red-500">*</span></label>
+                  <input type="text" required placeholder="e.g. Priya Sharma" value={form.name}
+                    onChange={(e) => setForm({ ...form, name: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Work Email <span className="text-red-500">*</span></label>
+                  <input type="email" required placeholder="you@company.com" value={form.email}
+                    onChange={(e) => setForm({ ...form, email: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Department</label>
+                  <select value={form.departmentId} onChange={(e) => setForm({ ...form, departmentId: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent bg-white">
+                    <option value="">Select department</option>
+                    {departments.map((d) => <option key={d.id} value={d.id}>{d.name}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-1">Grade / Level <span className="text-gray-400 font-normal">(optional)</span></label>
+                  <input type="text" placeholder="e.g. L4, Manager, VP" value={form.grade}
+                    onChange={(e) => setForm({ ...form, grade: e.target.value })}
+                    className="w-full px-3 py-2.5 border border-gray-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent" />
+                </div>
+                {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
+                <button type="submit" disabled={loading}
+                  className="w-full py-3 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors mt-2">
+                  {loading ? "Sending code…" : "Send Verification Code →"}
+                </button>
+              </form>
+            </>
+          ) : (
+            <>
+              <button onClick={() => { setStep("form"); setOtp(["","","","","",""]); setError(""); }}
+                className="text-sm text-indigo-600 hover:underline mb-4 flex items-center gap-1">
+                ← Back
+              </button>
+              <h2 className="text-lg font-semibold text-gray-900 mb-1">Check your email</h2>
+              <p className="text-sm text-gray-500 mb-6">
+                We sent a 6-digit code to <strong>{form.email}</strong>. Enter it below to continue.
+              </p>
+              <form onSubmit={handleOtpSubmit} className="space-y-6">
+                <div>
+                  <div className="flex gap-2 justify-center" onPaste={handleOtpPaste}>
+                    {otp.map((digit, i) => (
+                      <input
+                        key={i}
+                        ref={(el) => { otpRefs.current[i] = el; }}
+                        type="text"
+                        inputMode="numeric"
+                        maxLength={1}
+                        value={digit}
+                        onChange={(e) => handleOtpChange(i, e.target.value)}
+                        onKeyDown={(e) => handleOtpKey(i, e)}
+                        className="w-11 h-14 text-center text-xl font-bold border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-indigo-500 focus:border-transparent"
+                      />
+                    ))}
+                  </div>
+                  <p className="text-xs text-gray-400 text-center mt-3">Code expires in 10 minutes</p>
+                </div>
+                {error && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>}
+                <button type="submit" disabled={loading || otp.join("").length < 6}
+                  className="w-full py-3 bg-indigo-600 text-white rounded-lg text-sm font-semibold hover:bg-indigo-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors">
+                  {loading ? "Verifying…" : "Verify & Begin Assessment →"}
+                </button>
+                <button type="button" onClick={handleFormSubmit as unknown as React.MouseEventHandler}
+                  className="w-full text-sm text-gray-500 hover:text-gray-700">
+                  Didn't receive it? Resend code
+                </button>
+              </form>
+            </>
+          )}
         </div>
 
         <p className="text-center text-xs text-gray-400 mt-6">
