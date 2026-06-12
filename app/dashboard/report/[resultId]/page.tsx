@@ -72,16 +72,96 @@ import ZoneBarChart from "@/components/charts/ZoneBarChart";
 import MaturityGauge from "@/components/charts/MaturityGauge";
 import QuadrantChart from "@/components/charts/QuadrantChart";
 import AIInsightsPanel from "@/components/report/AIInsightsPanel";
+import LangToggle from "@/components/report/LangToggle";
+import { Suspense } from "react";
+
+const DIMENSION_LABELS_HI: Record<string, string> = {
+  A: "रणनीतिक सोच", B: "विवरण पर ध्यान", C: "प्रत्यायोजन क्षमता",
+  D: "तनाव प्रबंधन", E: "पहल", F: "परिवर्तन स्वीकृति",
+  G: "जवाबदेही", H: "संकट निर्भरता", I: "सहयोग", J: "कार्यभार प्रबंधन",
+};
+
+const ZONE_LABELS_HI: Record<string, string> = {
+  Dreamer: "स्वप्नद्रष्टा", Perfectionist: "पूर्णतावादी", Delegate: "प्रत्यायोजक",
+  Rebel: "विद्रोही", CrisisMaker: "संकट निर्माता", Avoider: "परिहारकर्ता", Overwhelmed: "अभिभूत",
+};
+
+const DIMENSION_GUIDANCE_HI: Record<string, { high: string; mid: string; low: string; focus: string }> = {
+  A: {
+    high: "आप लगातार आगे की सोचते हैं और निर्णयों को दीर्घकालिक लक्ष्यों के साथ संरेखित करते हैं। एक स्पष्ट रणनीतिक संपत्ति।",
+    mid: "आप परिचित संदर्भों में रणनीतिक रूप से सोचते हैं लेकिन दबाव में सामरिक मोड में आ सकते हैं।",
+    low: "दैनिक कार्य हावी रहते हैं। दीर्घकालिक सोच तत्काल मांगों से दब सकती है।",
+    focus: "साप्ताहिक 30 मिनट समीक्षा करें कि 12 महीनों में आपकी टीम/भूमिका कहाँ होगी। 'कैसे' से पहले 'क्यों' पूछने का अभ्यास करें।",
+  },
+  B: {
+    high: "आप त्रुटियाँ पकड़ते हैं, गुणवत्ता मानक बनाए रखते हैं और मूल कारणों का व्यवस्थित पता लगाते हैं।",
+    mid: "गुणवत्ता आमतौर पर अच्छी है लेकिन समयसीमा या प्रतिस्पर्धी मांगों के दौरान कम हो सकती है।",
+    low: "विस्तार और सटीकता असंगत हो सकती है, खासकर समय दबाव में।",
+    focus: "मुख्य कार्यों के लिए व्यक्तिगत समीक्षा चेकलिस्ट बनाएं। महत्वपूर्ण काम जमा करने से पहले धीमे हों।",
+  },
+  C: {
+    high: "आप प्रभावी ढंग से दूसरों को सशक्त बनाते हैं, ताकत के आधार पर सौंपते हैं और बिना सूक्ष्म-प्रबंधन के अनुवर्ती करते हैं।",
+    mid: "आप सिद्धांत में सौंपते हैं लेकिन महत्वपूर्ण कार्य रोक सकते हैं या पूरी तरह छोड़ने में संघर्ष कर सकते हैं।",
+    low: "अधिकांश काम आपके पास रहता है। यह टीम की वृद्धि को सीमित करता है और बाधाएं पैदा कर सकता है।",
+    focus: "इस सप्ताह एक कार्य पहचानें जिसे आप पूरी तरह सौंप सकते हैं। स्पष्ट निर्देश दें, परिणाम पर सहमत हों, फिर पीछे हटें।",
+  },
+  D: {
+    high: "आप दबाव में शांत रहते हैं और तनावपूर्ण अवधियों से जल्दी उबर जाते हैं।",
+    mid: "आप अधिकांश स्थितियों में तनाव को संभालते हैं लेकिन कुछ उच्च-दबाव परिदृश्य आपको अस्थिर कर सकते हैं।",
+    low: "तनाव आपके निर्णय, ऊर्जा या टीम के साथ उपस्थिति को प्रभावित कर रहा है।",
+    focus: "'दबाव प्रोटोकॉल' बनाएं — जब चीजें बढ़ें तो एक व्यक्तिगत दिनचर्या (जैसे रुकना, प्राथमिकता, संवाद)।",
+  },
+  E: {
+    high: "आप सक्रिय रूप से सुधार चलाते हैं, भूमिका से परे स्वामित्व लेते हैं और प्रतिरोध के बावजूद आगे बढ़ते हैं।",
+    mid: "आप अपने आराम क्षेत्र में पहल दिखाते हैं लेकिन नए क्षेत्रों में अनुमति या स्पष्ट संकेत का इंतजार कर सकते हैं।",
+    low: "कार्य दिशा की प्रतीक्षा करते हैं। नेतृत्व और सुधार के अवसर चूक सकते हैं।",
+    focus: "हर हफ्ते एक समस्या पहचानें जिसे आप बिना पूछे हल कर सकते हैं। छोटे से शुरू करें — पहल बढ़ती है।",
+  },
+  F: {
+    high: "आप जल्दी अनुकूलित होते हैं, परिवर्तन को अवसर के रूप में स्वीकार करते हैं और दूसरों को बदलाव में मदद करते हैं।",
+    mid: "आप बौद्धिक रूप से परिवर्तन स्वीकार करते हैं लेकिन व्यवहार में पूरी तरह अनुकूलित होने में समय लग सकता है।",
+    low: "परिवर्तन विघटनकारी लगता है और प्रतिरोध या अलगाव को ट्रिगर कर सकता है।",
+    focus: "जब परिवर्तन की घोषणा हो, एक चीज लिखें जो इसे बेहतर बना सकती है। व्यवधान को अवसर के रूप में पुनः तैयार करना एक कौशल है।",
+  },
+  G: {
+    high: "आप परिणामों की पूरी जिम्मेदारी लेते हैं, विश्वसनीय रूप से पालन करते हैं और दूसरों को जवाबदेह ठहराते हैं।",
+    mid: "जवाबदेही आमतौर पर मौजूद है लेकिन कठिन या अस्पष्ट स्थितियों में कमजोर हो सकती है।",
+    low: "दबाव में प्रतिबद्धताएं टूट सकती हैं या जिम्मेदारी स्थानांतरित हो सकती है।",
+    focus: "प्रत्येक प्रतिबद्धता को समयसीमा के साथ लॉग करें। साप्ताहिक समीक्षा करें। सक्रिय संवाद चूकी समयसीमाओं से बेहतर है।",
+  },
+  H: {
+    high: "आप संकट में असाधारण प्रदर्शन करते हैं — लेकिन स्थिर अवधियों में कृत्रिम तात्कालिकता बनाने से सावधान रहें।",
+    mid: "आप दबाव में अच्छे से संलग्न होते हैं लेकिन नियमित वातावरण में भी ध्यान केंद्रित रख सकते हैं।",
+    low: "नियमित काम आपको अच्छे से संलग्न करता है। जागरूक रहें कि अनावश्यक तात्कालिकता टीमों को थका देती है।",
+    focus: "ध्यान दें जब आप अनावश्यक रूप से तात्कालिकता बढ़ाते हैं। स्थिर अवधियों में प्रतिक्रिया के बजाय रोकथाम पर ध्यान दें।",
+  },
+  I: {
+    high: "आप मजबूत क्रॉस-फंक्शनल संबंध बनाते हैं, खुले से साझा करते हैं और दूसरों के लिए संवाद अनुकूलित करते हैं।",
+    mid: "सहयोग आपकी टीम में काम करता है लेकिन क्रॉस-फंक्शनल संबंध अविकसित हो सकते हैं।",
+    low: "साइलो में काम करना जोखिम है। दूसरों को सूचित, शामिल या सुना नहीं महसूस हो सकता।",
+    focus: "प्रति सप्ताह एक क्रॉस-टीम बातचीत शेड्यूल करें। निर्णय अंतिम होने से पहले इनपुट मांगें।",
+  },
+  J: {
+    high: "आप सटीक अनुमान लगाते हैं, उच्च-प्राथमिकता कार्यों की रक्षा करते हैं और मात्रा में भी गुणवत्ता बनाए रखते हैं।",
+    mid: "प्राथमिकताएं आमतौर पर प्रबंधित हैं लेकिन व्यस्त समय में प्रतिक्रियाशील कार्य महत्वपूर्ण काम को भीड़ा सकते हैं।",
+    low: "कार्यभार अस्थिर लगता है। गुणवत्ता या प्राथमिकता संरेखण प्रभावित हो सकता है।",
+    focus: "प्रत्येक सप्ताह अपनी शीर्ष 3 प्राथमिकताओं को सूचीबद्ध करके शुरू करें। प्रतिक्रियाशील कार्यों से पहले उनके लिए समय सुरक्षित करें।",
+  },
+};
 
 export default async function ReportPage({
   params,
+  searchParams,
 }: {
   params: Promise<{ resultId: string }>;
+  searchParams: Promise<{ lang?: string }>;
 }) {
   const session = await auth();
   if (!session) redirect("/login");
 
   const { resultId } = await params;
+  const { lang = "en" } = await searchParams;
+  const hi = lang === "hi";
 
   const result = await prisma.assessmentResult.findUnique({
     where: { id: resultId },
@@ -110,7 +190,7 @@ export default async function ReportPage({
   const secProfile = ZONE_PROFILES[sec];
 
   const radarData = DIMENSIONS.map((d) => ({
-    dimension: DIMENSION_LABELS[d],
+    dimension: hi ? (DIMENSION_LABELS_HI[d] ?? DIMENSION_LABELS[d]) : DIMENSION_LABELS[d],
     short: d,
     score: Math.round(dims[d]),
   }));
@@ -137,49 +217,51 @@ export default async function ReportPage({
               {result.assignment.user.grade ?? "—"} · {result.assignment.user.department?.name ?? "—"}
             </span>
             <span className="text-xs text-gray-400">
-              Completed {result.createdAt.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" })}
+              {hi ? "पूर्ण किया" : "Completed"} {result.createdAt.toLocaleDateString(hi ? "hi-IN" : "en-GB", { day: "numeric", month: "short", year: "numeric" })}
             </span>
           </div>
           <div className="flex gap-2 mt-3 flex-wrap">
             <span className={`px-3 py-1 rounded-full text-sm font-semibold ${domProfile.color} ${domProfile.textColor}`}>
-              {domProfile.emoji} {dom.replace("CrisisMaker", "Crisis Maker")} (Primary)
+              {domProfile.emoji} {hi ? (ZONE_LABELS_HI[dom] ?? dom) : dom.replace("CrisisMaker", "Crisis Maker")} ({hi ? "प्राथमिक" : "Primary"})
             </span>
             <span className={`px-3 py-1 rounded-full text-sm font-medium ${secProfile.color} ${secProfile.textColor}`}>
-              {secProfile.emoji} {sec.replace("CrisisMaker", "Crisis Maker")} (Secondary)
+              {secProfile.emoji} {hi ? (ZONE_LABELS_HI[sec] ?? sec) : sec.replace("CrisisMaker", "Crisis Maker")} ({hi ? "द्वितीयक" : "Secondary"})
             </span>
           </div>
         </div>
-        <a
-          href={`/api/pdf/${resultId}`}
-          className="flex-shrink-0 px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition-colors"
-        >
-          Download PDF
-        </a>
+        <div className="flex flex-col items-end gap-3">
+          <Suspense><LangToggle lang={lang} /></Suspense>
+          <a
+            href={`/api/pdf/${resultId}`}
+            className="flex-shrink-0 px-4 py-2 bg-indigo-600 text-white text-sm rounded-lg hover:bg-indigo-700 transition-colors"
+          >
+            {hi ? "PDF डाउनलोड करें" : "Download PDF"}
+          </a>
+        </div>
       </div>
 
       {/* Zone explainer */}
       <div className="bg-indigo-50 border border-indigo-100 rounded-2xl px-6 py-4">
         <p className="text-sm text-indigo-900 leading-relaxed">
-          <span className="font-semibold">What are Operating Zones?</span> Based on your 40 responses, the scoring engine maps your leadership behaviour across 7 operating patterns.
-          Your <span className="font-semibold">Primary Zone</span> is the style that dominates your day-to-day approach — how you instinctively lead, decide, and respond under pressure.
-          Your <span className="font-semibold">Secondary Zone</span> is a supporting pattern that also shows up, often in different contexts or when the primary style is under stress.
-          Together they paint a picture of your natural operating range.
+          {hi ? (
+            <><span className="font-semibold">ऑपरेटिंग ज़ोन क्या हैं?</span> आपके 40 उत्तरों के आधार पर, स्कोरिंग इंजन आपके नेतृत्व व्यवहार को 7 ऑपरेटिंग पैटर्न में मैप करता है। आपका <span className="font-semibold">प्राथमिक ज़ोन</span> वह शैली है जो आपके दैनिक दृष्टिकोण पर हावी है — आप स्वाभाविक रूप से कैसे नेतृत्व करते हैं, निर्णय लेते हैं और दबाव में कैसे प्रतिक्रिया देते हैं। आपका <span className="font-semibold">द्वितीयक ज़ोन</span> एक सहायक पैटर्न है जो अलग-अलग संदर्भों में या जब प्राथमिक शैली तनाव में हो तब सामने आता है।</>
+          ) : (
+            <><span className="font-semibold">What are Operating Zones?</span> Based on your 40 responses, the scoring engine maps your leadership behaviour across 7 operating patterns. Your <span className="font-semibold">Primary Zone</span> is the style that dominates your day-to-day approach — how you instinctively lead, decide, and respond under pressure. Your <span className="font-semibold">Secondary Zone</span> is a supporting pattern that also shows up, often in different contexts or when the primary style is under stress. Together they paint a picture of your natural operating range.</>
+          )}
         </p>
       </div>
 
       {/* Zone cards */}
       <div className="grid grid-cols-2 gap-4">
-        {[
-          { label: "Primary Zone", sublabel: "Your dominant day-to-day style", profile: domProfile },
-          { label: "Secondary Zone", sublabel: "Your supporting / situational style", profile: secProfile },
-        ].map(({ label, sublabel, profile }) => (
+        {([
+          { label: hi ? "प्राथमिक ज़ोन" : "Primary Zone", sublabel: hi ? "आपकी दैनिक प्रमुख शैली" : "Your dominant day-to-day style", profile: domProfile, zone: dom },
+          { label: hi ? "द्वितीयक ज़ोन" : "Secondary Zone", sublabel: hi ? "आपकी सहायक / स्थितिजन्य शैली" : "Your supporting / situational style", profile: secProfile, zone: sec },
+        ] as const).map(({ label, sublabel, profile, zone }) => (
           <div key={label} className={`rounded-2xl p-5 ${profile.color}`}>
-            <div className={`text-xs font-semibold uppercase tracking-wider ${profile.textColor} opacity-60`}>
-              {label}
-            </div>
+            <div className={`text-xs font-semibold uppercase tracking-wider ${profile.textColor} opacity-60`}>{label}</div>
             <div className={`text-xs ${profile.textColor} opacity-70 mb-2`}>{sublabel}</div>
             <div className={`text-xl font-bold ${profile.textColor} mb-1`}>
-              {profile.emoji} {profile.label}
+              {profile.emoji} {hi ? (ZONE_LABELS_HI[zone] ?? profile.label) : profile.label}
             </div>
             <p className={`text-sm italic ${profile.textColor} opacity-80 mb-2`}>{profile.tagline}</p>
             <p className={`text-sm ${profile.textColor} opacity-90 leading-relaxed`}>{profile.description}</p>
@@ -190,14 +272,14 @@ export default async function ReportPage({
       {/* Charts row 1: Radar + Quadrant */}
       <div className="grid grid-cols-2 gap-4">
         <div className="bg-white rounded-2xl border border-gray-200 p-5">
-          <h3 className="font-semibold text-gray-900 mb-1">Dimension Profile</h3>
-          <p className="text-xs text-gray-400 mb-4">Scores across all 10 leadership dimensions (0–100)</p>
+          <h3 className="font-semibold text-gray-900 mb-1">{hi ? "आयाम प्रोफ़ाइल" : "Dimension Profile"}</h3>
+          <p className="text-xs text-gray-400 mb-4">{hi ? "सभी 10 नेतृत्व आयामों में स्कोर (0–100)" : "Scores across all 10 leadership dimensions (0–100)"}</p>
           <RadarChart data={radarData} />
         </div>
         <div className="bg-white rounded-2xl border border-gray-200 p-5">
-          <h3 className="font-semibold text-gray-900 mb-1">Leadership Quadrant</h3>
+          <h3 className="font-semibold text-gray-900 mb-1">{hi ? "नेतृत्व चतुर्थांश" : "Leadership Quadrant"}</h3>
           <p className="text-xs text-gray-400 mb-4">
-            X: Execution (Accountability + Workload) · Y: Strategy (Strategic Thinking + Delegation + Collaboration)
+            {hi ? "X: निष्पादन (जवाबदेही + कार्यभार) · Y: रणनीति (रणनीतिक सोच + प्रत्यायोजन + सहयोग)" : "X: Execution (Accountability + Workload) · Y: Strategy (Strategic Thinking + Delegation + Collaboration)"}
           </p>
           <QuadrantChart executionScore={executionScore} strategicScore={strategicScore} name={userName} />
         </div>
@@ -205,8 +287,8 @@ export default async function ReportPage({
 
       {/* Operating Zone Scores with strengths/improvements */}
       <div className="bg-white rounded-2xl border border-gray-200 p-6">
-        <h3 className="font-semibold text-gray-900 mb-1">Operating Zone Scores</h3>
-        <p className="text-xs text-gray-400 mb-5">Each zone score shows how strongly this operating style is present. Higher = more dominant.</p>
+        <h3 className="font-semibold text-gray-900 mb-1">{hi ? "ऑपरेटिंग ज़ोन स्कोर" : "Operating Zone Scores"}</h3>
+        <p className="text-xs text-gray-400 mb-5">{hi ? "प्रत्येक ज़ोन स्कोर दर्शाता है कि यह ऑपरेटिंग शैली कितनी प्रबल है। अधिक = अधिक प्रभावशाली।" : "Each zone score shows how strongly this operating style is present. Higher = more dominant."}</p>
         <div className="space-y-4">
           {zoneData.map(({ zone, score }) => {
             const zoneKey = zone.replace("Crisis Maker", "CrisisMaker") as Zone;
@@ -214,15 +296,15 @@ export default async function ReportPage({
             const isDominant = zone === dom.replace("CrisisMaker", "Crisis Maker");
             const isSecondary = zone === sec.replace("CrisisMaker", "Crisis Maker");
             const barColor = score >= 70 ? "bg-indigo-500" : score >= 50 ? "bg-indigo-400" : "bg-gray-300";
-            const isPositiveZone = ["Dreamer", "Perfectionist", "Delegate", "Rebel"].includes(zoneKey);
+            const zoneDisplayName = hi ? (ZONE_LABELS_HI[zoneKey] ?? zone) : zone;
             return (
               <div key={zone} className={`rounded-xl border p-4 transition-all ${isDominant ? "border-indigo-300 bg-indigo-50/50" : isSecondary ? "border-gray-200 bg-gray-50/50" : "border-gray-100"}`}>
                 <div className="flex items-center justify-between mb-2">
                   <div className="flex items-center gap-2">
                     <span className="text-lg">{profile.emoji}</span>
-                    <span className="font-semibold text-gray-900 text-sm">{zone}</span>
-                    {isDominant && <span className="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full">Primary</span>}
-                    {isSecondary && <span className="text-xs bg-gray-500 text-white px-2 py-0.5 rounded-full">Secondary</span>}
+                    <span className="font-semibold text-gray-900 text-sm">{zoneDisplayName}</span>
+                    {isDominant && <span className="text-xs bg-indigo-600 text-white px-2 py-0.5 rounded-full">{hi ? "प्राथमिक" : "Primary"}</span>}
+                    {isSecondary && <span className="text-xs bg-gray-500 text-white px-2 py-0.5 rounded-full">{hi ? "द्वितीयक" : "Secondary"}</span>}
                   </div>
                   <span className="text-sm font-bold text-gray-700">{score}/100</span>
                 </div>
@@ -232,7 +314,7 @@ export default async function ReportPage({
                 {(isDominant || isSecondary) && (
                   <div className="grid grid-cols-2 gap-3 mt-3">
                     <div>
-                      <p className="text-xs font-semibold text-emerald-700 mb-1.5">✓ What works well</p>
+                      <p className="text-xs font-semibold text-emerald-700 mb-1.5">{hi ? "✓ क्या अच्छा काम करता है" : "✓ What works well"}</p>
                       <ul className="space-y-1">
                         {profile.strengths.map((s) => (
                           <li key={s} className="text-xs text-gray-600 flex gap-1.5">
@@ -242,7 +324,7 @@ export default async function ReportPage({
                       </ul>
                     </div>
                     <div>
-                      <p className="text-xs font-semibold text-amber-700 mb-1.5">△ Scope for improvement</p>
+                      <p className="text-xs font-semibold text-amber-700 mb-1.5">{hi ? "△ सुधार की गुंजाइश" : "△ Scope for improvement"}</p>
                       <ul className="space-y-1">
                         {profile.risks.map((r) => (
                           <li key={r} className="text-xs text-gray-600 flex gap-1.5">
@@ -264,15 +346,15 @@ export default async function ReportPage({
 
       {/* Composite Indices */}
       <div className="bg-white rounded-2xl border border-gray-200 p-6">
-        <h3 className="font-semibold text-gray-900 mb-4">Composite Leadership Indices</h3>
+        <h3 className="font-semibold text-gray-900 mb-4">{hi ? "समग्र नेतृत्व सूचकांक" : "Composite Leadership Indices"}</h3>
         <div className="grid grid-cols-3 gap-4">
           {[
-            { label: "Leadership Maturity", value: result.leadershipMaturityScore, icon: "🎖️", high: false },
-            { label: "Delegation Index", value: result.delegationIndex, icon: "🤝", high: false },
-            { label: "Strategic Thinking", value: result.strategicThinkingIndex, icon: "🌟", high: false },
-            { label: "Execution Index", value: result.executionIndex, icon: "⚡", high: false },
-            { label: "Burnout Risk", value: result.burnoutRiskScore, icon: "🔥", high: true },
-            { label: "Succession Readiness", value: result.successionReadinessScore, icon: "📈", high: false },
+            { label: hi ? "नेतृत्व परिपक्वता" : "Leadership Maturity", value: result.leadershipMaturityScore, icon: "🎖️", high: false },
+            { label: hi ? "प्रत्यायोजन सूचकांक" : "Delegation Index", value: result.delegationIndex, icon: "🤝", high: false },
+            { label: hi ? "रणनीतिक सोच" : "Strategic Thinking", value: result.strategicThinkingIndex, icon: "🌟", high: false },
+            { label: hi ? "निष्पादन सूचकांक" : "Execution Index", value: result.executionIndex, icon: "⚡", high: false },
+            { label: hi ? "बर्नआउट जोखिम" : "Burnout Risk", value: result.burnoutRiskScore, icon: "🔥", high: true },
+            { label: hi ? "उत्तराधिकार तत्परता" : "Succession Readiness", value: result.successionReadinessScore, icon: "📈", high: false },
           ].map(({ label, value, icon, high }) => {
             const v = Math.round(value);
             const bg = high
@@ -295,8 +377,8 @@ export default async function ReportPage({
 
       {/* Dimension breakdown — rich cards */}
       <div className="bg-white rounded-2xl border border-gray-200 p-6">
-        <h3 className="font-semibold text-gray-900 mb-1">Dimension Breakdown</h3>
-        <p className="text-xs text-gray-400 mb-5">Each dimension is scored 0–100. Green = strength · Amber = developing · Red = focus area</p>
+        <h3 className="font-semibold text-gray-900 mb-1">{hi ? "आयाम विवरण" : "Dimension Breakdown"}</h3>
+        <p className="text-xs text-gray-400 mb-5">{hi ? "प्रत्येक आयाम 0–100 पर स्कोर किया गया है। हरा = शक्ति · नारंगी = विकासशील · लाल = फोकस क्षेत्र" : "Each dimension is scored 0–100. Green = strength · Amber = developing · Red = focus area"}</p>
         <div className="space-y-4">
           {DIMENSIONS.map((d) => {
             const score = Math.round(dims[d]);
@@ -305,16 +387,17 @@ export default async function ReportPage({
             const isFocus = score < 45;
             const barColor = isStrength ? "bg-emerald-500" : isDeveloping ? "bg-indigo-400" : "bg-amber-400";
             const badge = isStrength
-              ? { label: "Strength", cls: "bg-emerald-100 text-emerald-700" }
+              ? { label: hi ? "शक्ति" : "Strength", cls: "bg-emerald-100 text-emerald-700" }
               : isDeveloping
-              ? { label: "Developing", cls: "bg-indigo-100 text-indigo-700" }
-              : { label: "Focus Area", cls: "bg-amber-100 text-amber-700" };
-            const guidance = DIMENSION_GUIDANCE[d as Dimension];
+              ? { label: hi ? "विकासशील" : "Developing", cls: "bg-indigo-100 text-indigo-700" }
+              : { label: hi ? "फोकस क्षेत्र" : "Focus Area", cls: "bg-amber-100 text-amber-700" };
+            const guidance = hi ? DIMENSION_GUIDANCE_HI[d as Dimension] : DIMENSION_GUIDANCE[d as Dimension];
+            const dimLabel = hi ? (DIMENSION_LABELS_HI[d] ?? DIMENSION_LABELS[d as Dimension]) : DIMENSION_LABELS[d as Dimension];
             return (
               <div key={d} className="border border-gray-100 rounded-xl p-4">
                 <div className="flex items-center gap-3 mb-2">
                   <span className="w-6 h-6 rounded-full bg-gray-100 text-xs font-bold text-gray-500 flex items-center justify-center flex-shrink-0">{d}</span>
-                  <span className="font-semibold text-gray-900 text-sm flex-1">{DIMENSION_LABELS[d as Dimension]}</span>
+                  <span className="font-semibold text-gray-900 text-sm flex-1">{dimLabel}</span>
                   <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${badge.cls}`}>{badge.label}</span>
                   <span className="text-sm font-bold text-gray-700 w-8 text-right">{score}</span>
                 </div>
@@ -323,13 +406,13 @@ export default async function ReportPage({
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <div>
-                    <p className="text-xs font-semibold text-emerald-700 mb-1">✓ What this means</p>
+                    <p className="text-xs font-semibold text-emerald-700 mb-1">{hi ? "✓ इसका क्या अर्थ है" : "✓ What this means"}</p>
                     <p className="text-xs text-gray-600 leading-relaxed">
                       {isStrength ? guidance.high : isDeveloping ? guidance.mid : guidance.low}
                     </p>
                   </div>
                   <div>
-                    <p className="text-xs font-semibold text-indigo-700 mb-1">→ Focus area</p>
+                    <p className="text-xs font-semibold text-indigo-700 mb-1">{hi ? "→ फोकस क्षेत्र" : "→ Focus area"}</p>
                     <p className="text-xs text-gray-600 leading-relaxed">{guidance.focus}</p>
                   </div>
                 </div>
@@ -340,6 +423,9 @@ export default async function ReportPage({
       </div>
 
       {/* AI Insights */}
+      {hi && (
+        <p className="text-xs text-gray-400 -mb-2 px-1">{hi ? "AI अंतर्दृष्टि अंग्रेजी में उत्पन्न की जाती है" : ""}</p>
+      )}
       <AIInsightsPanel resultId={resultId} initialInsights={aiInsights} />
     </div>
   );
