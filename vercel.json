@@ -1,5 +1,8 @@
 {
   "framework": "nextjs",
   "buildCommand": "npx prisma generate && next build",
-  "installCommand": "npm install"
+  "installCommand": "npm install",
+  "functions": {
+    "app/api/insights/route.ts": { "maxDuration": 60 }
+  }
 }

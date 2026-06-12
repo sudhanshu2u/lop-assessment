@@ -28,7 +28,14 @@ export default function AIInsightsPanel({ resultId, initialInsights }: Props) {
   useEffect(() => {
     if (insights) return;
 
-    // Poll until insights are generated
+    // Trigger generation from client — fire-and-forget in serverless gets killed on response
+    fetch("/api/insights", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ resultId }),
+    }).catch(() => {});
+
+    // Poll every 4s until insights arrive
     const poll = async () => {
       try {
         const res = await fetch(`/api/results/${resultId}`);
@@ -40,7 +47,7 @@ export default function AIInsightsPanel({ resultId, initialInsights }: Props) {
       } catch {}
     };
 
-    const interval = setInterval(poll, 3000);
+    const interval = setInterval(poll, 4000);
     poll();
     return () => clearInterval(interval);
   }, [resultId, insights]);
